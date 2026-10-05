@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>مدیریت انبار</title>
+
+<style>
+body{
+    font-family:Tahoma,Arial,sans-serif;
+    margin:0;
+    background:#f4f6f8;
+    color:#222;
+}
+
+.container{
+    max-width:700px;
+    margin:auto;
+    padding:20px;
+}
+
+.card{
+    background:white;
+    padding:20px;
+    border-radius:15px;
+    margin-bottom:15px;
+    box-shadow:0 3px 12px rgba(0,0,0,.08);
+}
+
+h1,h2{
+    text-align:center;
+}
+
+input,button,select{
+    width:100%;
+    box-sizing:border-box;
+    padding:12px;
+    margin:6px 0;
+    border-radius:8px;
+    border:1px solid #ccc;
+    font-size:16px;
+}
+
+button{
+    cursor:pointer;
+    border:none;
+    background:#2563eb;
+    color:white;
+}
+
+button:hover{
+    opacity:.9;
+}
+
+.danger{
+    background:#dc2626;
+}
+
+.success{
+    background:#16a34a;
+}
+
+.product{
+    border:1px solid #ddd;
+    padding:12px;
+    border-radius:10px;
+    margin:10px 0;
+}
+
+.hidden{
+    display:none;
+}
+
+.row{
+    display:flex;
+    gap:8px;
+}
+
+.row button{
+    flex:1;
+}
+
+.small{
+    font-size:13px;
+    color:#666;
+}
+
+.price{
+    font-weight:bold;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<div id="loginBox" class="card">
+    <h1>سیستم مدیریت انبار</h1>
+
+    <input id="username"
+           placeholder="نام کاربری"
+           value="admin">
+
+    <input id="password"
+           type="password"
+           placeholder="رمز عبور"
+           value="1234">
+
+    <button onclick="login()">ورود</button>
+</div>
+
+
+<div id="appBox" class="hidden">
+
+<div class="card">
+    <h2>مدیریت انبار</h2>
+
+    <div class="row">
+        <button onclick="home()">خانه</button>
+        <button onclick="showProducts()">کالاها</button>
+    </div>
+
+    <div class="row">
+        <button onclick="showAddForm()">افزودن کالا</button>
+        <button onclick="showSaleForm()">فروش</button>
+    </div>
+
+    <div class="row">
+        <button onclick="report()">گزارش مالی</button>
+        <button class="danger" onclick="logout()">خروج</button>
+    </div>
+</div>
+
+
+<div id="content"></div>
+
+</div>
+
+</div>
+
+
+<script>
+
+let TOKEN = localStorage.getItem("inventory_token");
+
+
+async function api(path, method="GET", data=null){
+
+    const headers = {
+        "Content-Type":"application/json"
+    };
+
+    if(TOKEN){
+        headers["Authorization"] = "Bearer " + TOKEN;
+    }
+
+    const options = {
+        method:method,
+        headers:headers
+    };
+
+    if(data !== null){
+        options.body = JSON.stringify(data);
+    }
+
+    const response = await fetch(path, options);
+
+    let result;
+
+    try{
+        result = await response.json();
+    }catch{
+        result = {};
+    }
+
+    if(!response.ok){
+        throw new Error(result.error || "خطایی رخ داد");
+    }
+
+    return result;
+}
+
+
+async function login(){
+
+    const username =
+        document.getElementById("username").value.trim();
+
+    const password =
+        document.getElementById("password").value;
+
+    try{
+
+        const data = await api(
+            "/api/login",
+            "POST",
+            {
+                username:username,
+                password:password
+            }
+        );
+
+        TOKEN = data.token;
+
+        localStorage.setItem(
+            "inventory_token",
+            TOKEN
+        );
+
+        document.getElementById("loginBox")
+            .classList.add("hidden");
+
+        document.getElementById("appBox")
+            .classList.remove("hidden");
+
+        home();
+
+    }catch(e){
+
+        alert(e.message);
+
+    }
+}
+
+
+function logout(){
+
+    TOKEN = null;
+
+    localStorage.removeItem("inventory_token");
+
+    document.getElementById("appBox")
+        .classList.add("hidden");
+
+    document.getElementById("loginBox")
+        .classList.remove("hidden");
+}
+
+
+async function home(){
+
+    const content =
+        document.getElementById("content");
+
+    content.innerHTML = `
+        <div class="card">
+            <h2>خوش آمدید</h2>
+            <p>سیستم مدیریت انبار ابری آماده است.</p>
+            <p class="small">
+                از دکمه‌های بالا برای مدیریت کالاها استفاده کنید.
+            </p>
+        </div>
+    `;
+
+    try{
+
+        const products =
+            await api("/api/products");
+
+        content.innerHTML += `
+            <div class="card">
+                <h3>خلاصه انبار</h3>
+                <p>تعداد کالاها: ${products.length}</p>
+            </div>
+        `;
+
+    }catch(e){
+
+        console.log(e);
+
+    }
+}
+
+
+async function showProducts(){
+
+    const content =
+        document.getElementById("content");
+
+    content.innerHTML = `
+        <div class="card">
+            <h2>لیست کالاها</h2>
+            <p>در حال دریافت اطلاعات...</p>
+        </div>
+    `;
+
+    try{
+
+        const products =
+            await api("/api/products");
+
+        if(products.length === 0){
+
+            content.innerHTML = `
+                <div class="card">
+                    <h2>کالایی وجود ندارد</h2>
+                    <button onclick="showAddForm()">
+                        افزودن اولین کالا
+                    </button>
+                </div>
+            `;
+
+            return;
+        }
+
+        let html = `
+            <div class="card">
+                <h2>لیست کالاها</h2>
+        `;
+
+        products.forEach(p => {
+
+            html += `
+                <div class="product">
+
+                    <h3>${escapeHtml(p.name)}</h3>
+
+                    <div>
+                        دسته‌بندی:
+                        ${escapeHtml(p.category || "-")}
+                    </div>
+
+                    <div>
+                        موجودی:
+                        <strong>${p.stock}</strong>
+                    </div>
+
+                    <div>
+                        قیمت خرید:
+                        <span class="price">
+                            ${Number(p.purchase_price).toLocaleString()}
+                        </span>
+                    </div>
+
+                    <div>
+                        قیمت فروش:
+                        <span class="price">
+                            ${Number(p.sale_price).toLocaleString()}
+                        </span>
+                    </div>
+
+                    <div>
+                        قفسه:
+                        ${escapeHtml(p.shelf || "-")}
+                    </div>
+
+                    <div class="row">
+                        <button
+                            onclick="showEditForm(${p.id})">
+                            ویرایش
+                        </button>
+
+                        <button
+                            class="danger"
+                            onclick="deleteProduct(${p.id})">
+                            حذف
+                        </button>
+                    </div>
+
+                </div>
+            `;
+
+        });
+
+        html += `</div>`;
+
+        content.innerHTML = html;
+
+    }catch(e){
+
+        content.innerHTML = `
+            <div class="card">
+                <p>${escapeHtml(e.message)}</p>
+            </div>
+        `;
+
+    }
+}
+
+
+function showAddForm(){
+
+    document.getElementById("content").innerHTML = `
+
+        <div class="card">
+
+            <h2>افزودن کالا</h2>
+
+            <input id="name"
+                   placeholder="نام کالا">
+
+            <input id="category"
+                   placeholder="دسته‌بندی">
+
+            <input id="purchase_price"
+                   type="number"
+                   placeholder="قیمت خرید">
+
+            <input id="sale_price"
+                   type="number"
+                   placeholder="قیمت فروش">
+
+            <input id="stock"
+                   type="number"
+                   placeholder="موجودی">
+
+            <input id="shelf"
+                   placeholder="قفسه">
+
+            <button class="success"
+                    onclick="saveAdd()">
+                ذخیره کالا
+            </button>
+
+            <button onclick="showProducts()">
+                انصراف
+            </button>
+
+        </div>
+    `;
+}
+
+
+async function saveAdd(){
+
+    const data = {
+
+        name:
+            document.getElementById("name").value.trim(),
+
+        category:
+            document.getElementById("category").value.trim(),
+
+        purchase_price:
+            Number(
+                document.getElementById("purchase_price").value
+            ) || 0,
+
+        sale_price:
+            Number(
+                document.getElementById("sale_price").value
+            ) || 0,
+
+        stock:
+            Number(
+                document.getElementById("stock").value
+            ) || 0,
+
+        shelf:
+            document.getElementById("shelf").value.trim()
+
+    };
+
+    if(!data.name){
+
+        alert("نام کالا را وارد کنید");
+
+        return;
+    }
+
+    try{
+
+        await api(
+            "/api/products",
+            "POST",
+            data
+        );
+
+        alert("کالا با موفقیت اضافه شد");
+
+        showProducts();
+
+    }catch(e){
+
+        alert(e.message);
+
+    }
+}
+
+
+async function showEditForm(id){
+
+    try{
+
+        const products =
+            await api("/api/products");
+
+        const p =
+            products.find(x => x.id === id);
+
+        if(!p){
+            alert("کالا پیدا نشد");
+            return;
+        }
+
+        document.getElementById("content").innerHTML = `
+
+            <div class="card">
+
+                <h2>ویرایش کالا</h2>
+
+                <input id="edit_name"
+                       value="${escapeAttr(p.name)}"
+                       placeholder="نام کالا">
+
+                <input id="edit_category"
+                       value="${escapeAttr(p.category || "")}"
+                       placeholder="دسته‌بندی">
+
+                <input id="edit_purchase"
+                       type="number"
+                       value="${p.purchase_price}"
+                       placeholder="قیمت خرید">
+
+                <input id="edit_sale"
+                       type="number"
+                       value="${p.sale_price}"
+                       placeholder="قیمت فروش">
+
+                <input id="edit_stock"
+                       type="number"
+                       value="${p.stock}"
+                       placeholder="موجودی">
+
+                <input id="edit_shelf"
+                       value="${escapeAttr(p.shelf || "")}"
+                       placeholder="قفسه">
+
+                <button class="success"
+                        onclick="saveEdit(${p.id})">
+                    ذخیره تغییرات
+                </button>
+
+                <button onclick="showProducts()">
+                    انصراف
+                </button>
+
+            </div>
+        `;
+
+    }catch(e){
+
+        alert(e.message);
+
+    }
+}
+
+
+async function saveEdit(id){
+
+    const data = {
+
+        name:
+            document.getElementById("edit_name").value.trim(),
+
+        category:
+            document.getElementById("edit_category").value.trim(),
+
+        purchase_price:
+            Number(
+                document.getElementById("edit_purchase").value
+            ) || 0,
+
+        sale_price:
+            Number(
+                document.getElementById("edit_sale").value
+            ) || 0,
+
+        stock:
+            Number(
+                document.getElementById("edit_stock").value
+            ) || 0,
+
+        shelf:
+            document.getElementById("edit_shelf").value.trim()
+
+    };
+
+    try{
+
+        await api(
+            "/api/products/" + id,
+            "PUT",
+            data
+        );
+
+        alert("تغییرات ذخیره شد");
+
+        showProducts();
+
+    }catch(e){
+
+        alert(e.message);
+
+    }
+}
+
+
+async function deleteProduct(id){
+
+    if(!confirm("آیا از حذف این کالا مطمئن هستید؟")){
+        return;
+    }
+
+    try{
+
+        await api(
+            "/api/products/" + id,
+            "DELETE"
+        );
+
+        showProducts();
+
+    }catch(e){
+
+        alert(e.message);
+
+    }
+}
+
+
+async function showSaleForm(){
+
+    try{
+
+        const products =
+            await api("/api/products");
+
+        let options = "";
+
+        products.forEach(p => {
+
+            options += `
+                <option value="${p.id}">
+                    ${escapeHtml(p.name)}
+                    - موجودی: ${p.stock}
+                </option>
+            `;
+
+        });
+
+        document.getElementById("content").innerHTML = `
+
+            <div class="card">
+
+                <h2>ثبت فروش</h2>
+
+                <select id="sale_product">
+                    ${options}
+                </select>
+
+                <input id="sale_amount"
+                       type="number"
+                       min="1"
+                       placeholder="تعداد فروش">
+
+                <input id="sale_date"
+                       placeholder="تاریخ فروش - مثال: 1405-07-10">
+
+                <button class="success"
+                        onclick="saveSale()">
+                    ثبت فروش
+                </button>
+
+                <button onclick="showProducts()">
+                    انصراف
+                </button>
+
+            </div>
+        `;
+
+    }catch(e){
+
+        alert(e.message);
+
+    }
+}
+
+
+async function saveSale(){
+
+    const product_id =
+        Number(
+            document.getElementById("sale_product").value
+        );
+
+    const amount =
+        Number(
+            document.getElementById("sale_amount").value
+        );
+
+    const date =
+        document.getElementById("sale_date").value.trim();
+
+    try{
+
+        await api(
+            "/api/sales",
+            "POST",
+            {
+                product_id:product_id,
+                amount:amount,
+                date:date
+            }
+        );
+
+        alert("فروش با موفقیت ثبت شد");
+
+        showProducts();
+
+    }catch(e){
+
+        alert(e.message);
+
+    }
+}
+
+
+async function report(){
+
+    const month =
+        prompt(
+            "ماه را وارد کنید، مثال:\n1405-07"
+        );
+
+    if(!month){
+        return;
+    }
+
+    try{
+
+        const data =
+            await api(
+                "/api/report?month=" +
+                encodeURIComponent(month)
+            );
+
+        alert(
+            "گزارش مالی\n\n" +
+            "فروش: " +
+            Number(data.sales).toLocaleString() +
+            "\n" +
+            "ارزش انبار: " +
+            Number(data.inventory_value).toLocaleString()
+        );
+
+    }catch(e){
+
+        alert(e.message);
+
+    }
+}
+
+
+function escapeHtml(value){
+
+    return String(value)
+        .replace(/&/g,"&amp;")
+        .replace(/</g,"&lt;")
+        .replace(/>/g,"&gt;")
+        .replace(/"/g,"&quot;")
+        .replace(/'/g,"&#039;");
+}
+
+
+function escapeAttr(value){
+
+    return escapeHtml(value);
+}
+
+
+if(TOKEN){
+
+    document.getElementById("loginBox")
+        .classList.add("hidden");
+
+    document.getElementById("appBox")
+        .classList.remove("hidden");
+
+    home();
+}
+
+</script>
+
+</body>
+</html>
