@@ -1,0 +1,30 @@
+name: Build Anbaryar APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Build APK
+        id: build
+        uses: flet-dev/flet-build-action@v1
+        with:
+          target: apk
+          runner-python-version: "3.14"
+          bundled-python-version: "3.14"
+          build-number: ${{ github.run_number }}
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v7
+        with:
+          path: ${{ steps.build.outputs.archive-path }}
+          archive: false
+          if-no-files-found: error
