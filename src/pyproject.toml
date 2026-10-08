@@ -1,0 +1,21 @@
+[project]
+name = "anbaryar-mobile"
+version = "1.0.0"
+description = "اپلیکیشن مدیریت انبار انباریار"
+requires-python = ">=3.14"
+dependencies = [
+    "flet==1.0.3",
+]
+
+[tool.flet]
+product = "انباریار"
+description = "مدیریت هوشمند کالا و فروش"
+org = "anbaryar"
+icon_background = "#151515"
+
+[tool.flet.android]
+adaptive_icon_background = "#151515"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
